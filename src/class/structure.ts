@@ -78,6 +78,7 @@ export class Structure {
 
       // Calcula e adiciona o resultado da expressão lógica
       this.evaluateExpression(this.ast, rowValues).map(({ expression, value }, index) => {
+        if (value === undefined) return
         this.propositions.push(expression)
 
         this.addRowValues({
@@ -174,7 +175,7 @@ export class Structure {
           const subResult = this.evaluateExpression(node.body, values)
           const displayName = `(${subResult[0].expression})`
 
-          expressions.push(...subResult.map((values) => ({ ...values, expression: displayName })))
+          subResult.forEach((values) => expressions.push({ ...values, expression: values.expression }))
           input.push(displayName)
 
           results.push(...subResult.map((result) => result.value))

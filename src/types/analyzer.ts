@@ -1,4 +1,4 @@
-import { Tokenizer, TokenizerContent } from './tokenizer'
+import { TokenizerContent } from './tokenizer'
 
 export type Position = {
     line: number,
@@ -25,12 +25,6 @@ export enum OperationKey {
     XOR = 'XOR',
     None = 'None'
 }
-
-// export type Negation = {
-//     type: 'Negation',
-//     value: string
-//     negatived: true
-// }
 
 export type Proposition = {
     type: 'Proposition',

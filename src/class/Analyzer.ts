@@ -19,7 +19,7 @@ import {
   AnalyzerOptions,
   Node,
   OperationKey,
-  OperationValues,
+  OperationValues
 } from '../types/analyzer.js'
 import { TokenizerContent, Tokenizer as TokenizerType } from '../types/tokenizer.js'
 import { Method } from './Methods.js'
@@ -47,8 +47,8 @@ export class Analyzer<T extends string | Tokenizer>{
    *
    * @returns {Node[]} Retorna a Analyzer gerada
    */
-  parse(tokens?: TokenizerType[], index?: number): Node[] | ErrorType {
-    if (this.tokenizer.exceptions.length > 0) return this.tokenizer.exceptions[0]
+  parse(tokens?: TokenizerType[], index?: number): Node[] {
+    if (this.tokenizer.exceptions.length > 0) throw new Error(this.tokenizer.exceptions.map((erro) => erro.message).join('\n'))
 
     tokens = tokens ?? this.tokenizer.tokens
     let actualIndex = index ?? Analyzer.parseIndex
@@ -65,24 +65,15 @@ export class Analyzer<T extends string | Tokenizer>{
           index: actualIndex,
           tokens,
         })
-        if (result === undefined)
-          return new NotInstantiatedError({ method: 'Proposition', loc })
-        if (isError(result))
-          return result
+        if (result === undefined) throw new NotInstantiatedError({ method: 'Proposition', loc })
+        if (isError(result)) throw result
 
         ast.push(result)
-        actualIndex++
-        Analyzer.parseIndex++
         break
       }
-      case operationsAllowed.includes(value): {
+      case (operationsAllowed.includes(value) && !negationExpressions.includes(value)): {
         // Caso seja uma negativa de uma Preposição, ele deve ser pulado,
         // já que ele será anexado à Preposição com o elemento negado
-        if (negationExpressions.includes(value)) {
-          actualIndex++
-          Analyzer.parseIndex++
-          continue
-        }
         const result = Method.execute({
           type: 'Operation',
           ast: this,
@@ -90,13 +81,10 @@ export class Analyzer<T extends string | Tokenizer>{
           tokens,
         })
         if (result === undefined)
-          return new NotInstantiatedError({ method: 'Operation', loc })
-        if (isError(result))
-          return result
+          throw new NotInstantiatedError({ method: 'Operation', loc })
+        if (isError(result)) throw result
 
         ast.push(result)
-        actualIndex++
-        Analyzer.parseIndex++
         break
       }
       case value === '(': {
@@ -107,23 +95,24 @@ export class Analyzer<T extends string | Tokenizer>{
           tokens
         })
         if (result === undefined)
-          return new NotInstantiatedError({ method: 'SubExpression', loc })
-        if (isError(result))
-          return result
+          throw new NotInstantiatedError({ method: 'SubExpression', loc })
+        if (isError(result)) throw result
 
         ast.push(result)
-        Analyzer.parseIndex++
-        actualIndex = ++Analyzer.parseIndex
+        actualIndex = Analyzer.parseIndex + 1
         break
       }
       default: {
-        return new UndeterminedError({ value, loc })
+        if (negationExpressions.includes(value) || value === ')') break
+        throw new UndeterminedError({ value, loc })
       }
       }
+      actualIndex++
+      Analyzer.parseIndex++
     }
 
     const error = this.validation(ast)
-    if (error !== undefined) return error
+    if (error !== undefined) throw error
 
     this.ast = ast
     return ast
@@ -160,7 +149,7 @@ export class Analyzer<T extends string | Tokenizer>{
         switch (element.type) {
         case 'Proposition': {
           if (nextElement !== undefined && nextElement?.type !== 'Operation')
-            return new UnexpectedError({
+            throw new UnexpectedError({
               origin: element.type,
               expected: ['Operation'],
               unexpected: nextElement.type,
@@ -177,7 +166,7 @@ export class Analyzer<T extends string | Tokenizer>{
              * Correct: P ^ Q
              */
           if (element.key === 'None')
-            return new UnexpectedError({
+            throw new UnexpectedError({
               origin: element.key,
               expected: ['Proposition', 'SubExpression'],
               unexpected: nextElement.type,
@@ -193,7 +182,7 @@ export class Analyzer<T extends string | Tokenizer>{
             nextElement !== undefined &&
               !['Proposition', 'SubExpression'].includes(nextElement?.type)
           )
-            return new UnexpectedError({
+            throw new UnexpectedError({
               origin: nextElement.type,
               expected: ['Proposition', 'SubExpression'],
               unexpected: nextElement.type,
@@ -206,7 +195,7 @@ export class Analyzer<T extends string | Tokenizer>{
              * Correct: P ^ Q ^ R
              */
           if (nextElement === undefined)
-            return new UnexpectedError({
+            throw new UnexpectedError({
               origin: element.type,
               expected: ['Proposition', 'SubExpression'],
               unexpected: 'None',
@@ -228,7 +217,7 @@ export class Analyzer<T extends string | Tokenizer>{
             nextElement !== undefined &&
               !['Operation'].includes(nextElement?.type)
           )
-            return new UnexpectedError({
+            throw new UnexpectedError({
               origin: element.type,
               expected: ['Operation'],
               unexpected: nextElement.type,
